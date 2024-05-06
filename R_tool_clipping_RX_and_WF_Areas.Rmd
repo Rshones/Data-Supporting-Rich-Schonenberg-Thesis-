@@ -1,0 +1,181 @@
+---
+title: "Specific_RASter_clips"
+author: "Rich"
+date: "2024-02-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("raster")
+library(raster)
+library(sf)
+library(dplyr)
+```
+
+
+## Making RX polygon mosiacs while preserving overlaps
+
+```{r}
+# Set the directory path
+polygon_dir <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSRX/BURNDBY"
+# List all shapefiles in the directory
+polygon_files <- list.files(polygon_dir, pattern = "\\.shp$", full.names = TRUE)
+# Read each shapefile into an sf object and store them in a list
+polygon_list <- lapply(polygon_files, st_read)
+```
+
+
+```{r}
+# Combine all polygons into one
+combined_polygon <- do.call(rbind, polygon_list)
+# preserve attribute information, you can create a new attribute to differentiate between the original polygons
+combined_polygon$source <- factor(rep(polygon_files, sapply(polygon_list, nrow)))
+```
+
+
+```{r}
+# Specify the output shapefile path
+output_shapefile <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSRX"
+
+# Write the combined polygon layer to a shapefile
+st_write(combined_polygon, output_shapefile, driver = "ESRI Shapefile")
+
+```
+
+## Making WF polygon mosiacs while preserving overlaps
+
+```{r}
+polygon_dir <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/CONDENSED/BURN BODY"
+
+# List all shapefiles in the directory
+polygon_files <- list.files(polygon_dir, pattern = "\\.shp$", full.names = TRUE)
+
+# Read each shapefile into an sf object and store them in a list
+polygon_list <- lapply(polygon_files, st_read)
+
+# Combine all polygons into one
+combined_polygon <- do.call(rbind, polygon_list)
+
+# Optionally, if you want to preserve attribute information, you can create a new attribute to differentiate between the original polygons
+combined_polygon$source <- factor(rep(polygon_files, sapply(polygon_list, nrow)))
+
+# Specify the output shapefile path
+output_shapefile <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/CONDENSED/combined_polygons.shp"
+
+# Write the combined polygon layer to a shapefile
+st_write(combined_polygon, output_shapefile, driver = "ESRI Shapefile")
+```
+
+
+#OVerlapp instersectoion 
+
+```{r}
+combined_polygons <- st_read("C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/CONDENSED/combined_polygons.shp")
+CONUSRX <- st_read("C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSRX/CONUSRX.shp")
+
+# Perform intersection to find overlapping polygons
+overlap <- st_intersection(combined_polygons, CONUSRX)
+
+# Check if there are any overlapping polygons
+if (nrow(overlap) == 0) {
+  stop("No overlapping polygons found.")
+} else {
+  # Create a new attribute indicating overlap
+  overlap$overlap <- "yes"
+  
+  # Write the overlapping polygons to a new shapefile
+  output_shapefile <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/overlap_polygons.shp"
+  st_write(overlap, output_shapefile, driver = "ESRI Shapefile")
+}
+```
+
+
+##result will contain the polygons from combined_polygons with the overlapping areas replaced by overlap_polygons.
+
+
+```{r}
+overlap <- st_intersection(combined_polygons, overlap)
+non_overlap <- st_difference(combined_polygons, overlap)
+result <- st_union(non_overlap, overlap)
+
+```
+
+
+##Wildfire DNBR data
+
+
+```{r}
+polygon_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/CONDENSED/BURN BODY"
+raster_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/CONDENSED/DNBR"
+output_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/Clipped_Rasters"
+```
+
+
+
+```{r}
+output_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/Clipped_Rasters"
+if (!dir.exists(output_path)) {
+  dir.create(output_path, recursive = TRUE)
+}
+```
+
+# List files in the directory
+
+```{r}
+polygon_files <- list.files(polygon_path, full.names = TRUE, pattern = "\\.shp$", recursive = TRUE)
+raster_files <- list.files(raster_path, full.names = TRUE, pattern = "\\.tif$", recursive = TRUE)
+```
+
+# Iterate through each pair of raster and polygon files
+
+```{r}
+for (i in 1:length(raster_files)) {
+  # Load raster and polygon data
+  raster_data <- raster(raster_files[i])
+  polygon_data <- shapefile(polygon_files[i])
+  
+  # Clip raster using polygon
+  clipped_raster <- mask(raster_data, polygon_data)
+  
+  # Define output filename
+  output_filename <- file.path(output_path, paste0("clipped_", basename(raster_files[i])))
+  
+  # Save clipped raster to output directory
+  writeRaster(clipped_raster, filename = output_filename, format = "GTiff", overwrite = TRUE)
+  
+  # Print progress
+  print(paste("Clipping complete for:", basename(raster_files[i])))
+}
+```
+
+
+#clipall rasters by bimodal tree cover from raster 
+
+```{r}
+raster_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/Clipped_Rasters"
+forest_cover_path <- "C:/Users/z44h489/OneDrive - Montana State University/Documents/Desktop/Biophysical Model Data/CONUSWF/Dry_Western_Con_BiModal.tif"
+
+# List DNBR raster files
+raster_files <- list.files(raster_path, full.names = TRUE, pattern = "\\.tif$", recursive = TRUE)
+
+# Read forest cover raster
+forest_cover <- raster(forest_cover_path)
+
+# Iterate through each DNBR raster file
+for (raster_file in raster_files) {
+  # Read DNBR raster
+  dnbr_raster <- raster(raster_file)
+  
+  # Clip DNBR raster to forest cover extent
+  clipped_raster <- crop(dnbr_raster, extent(forest_cover))
+  
+  # Write clipped raster to output directory
+  writeRaster(clipped_raster, filename = raster_file, format = "GTiff", overwrite = TRUE)
+  
+  # Print progress
+  print(paste("Clipping complete for:", basename(raster_file)))
+}
+```
+
+

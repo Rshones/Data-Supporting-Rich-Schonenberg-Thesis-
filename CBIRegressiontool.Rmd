@@ -1,0 +1,278 @@
+---
+title: "CBI Regression tool"
+date: "2023-03-17"
+author: "Rich Schonenberg"
+output:
+  word_document: default
+  pdf_document: default
+subtitle: Utilizing publicly sourced Field Based Composite Burn Index (CBI) to Evaluate Accuracy of remotely sensed differenced Normalized Burn Ratio (dNBR) 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      include = TRUE,
+                      eval= TRUE
+                      )
+```
+
+Package Installs
+
+```{r}
+library(ggplot2)
+library(mgcv)
+library(readxl)
+library(ggpubr)
+library(ggpmisc)
+```
+
+#Aggregate and Clean CBI data
+
+Navigate to USGS Science Base catalog and download Composite Burn Index (CBI) Data for the Conterminous US, Collected Between 1996 and 2018 (Fieldguide.mt.gov/displayES.aspx?id=2). Import Shape file into ArcPro to clip desired extent. load into R via clipboard or read Excel. Assess outliers or "Null" values, to have a clean Data frame
+
+
+myCBI_data<-myCBI_data1[-111,]
+myCBI_data <- read.table(file = "clipboard",   sep = "\t", header=TRUE)
+
+
+```{r}
+my_CBI_data <- read_excel(file.choose())
+my_CBI_data$Cbi<-as.numeric(as.character(my_CBI_data$Cbi))
+my_CBI_data$DNBR<-as.numeric(as.character(my_CBI_data$dNBR))
+plot(my_CBI_data$Cbi, my_CBI_data$DNBR,xlab= "Composite Burn Index (CBI)", ylab = "Differenced Normalized Burn Ratio (dNBR)" )
+
+```
+
+Using GGplot and evaluating Models
+
+```{r}
+CBI_DBR_PLOT1<-ggplot(my_CBI_data)+aes(y=Cbi, x=dNBR)+geom_point()+
+  labs(x="Composite Burn Index (CBI)", y="Differenced Normalized Burn Ratio (dNBR)")
+plot(CBI_RDBR_PLOT1)
+```
+
+
+```{r}
+ModelEval<-ggplot(my_CBI_data, aes(y = dNBR, x = Cbi)) + 
+    geom_point() +
+    geom_smooth(method = "gam", se = FALSE, aes(col = "GAM")) +
+    geom_smooth(method = "loess", span = .2, se = FALSE, aes(col = "Loess")) +
+    geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, aes(col = "Quadratic")) +
+    geom_smooth(method = "lm", se = FALSE, alpha =.2, aes(col = "OLS")) +
+    scale_color_viridis_d("Model", end = .75, option = "C") +
+    labs(x="Composite Burn Index (CBI)", y="Differenced Normalized Burn Ratio (dNBR)")
+ModelEval
+```
+
+
+
+
+looks like GAM is best fit
+using linear model approach
+
+```{r}
+Quadraticmodel<-lm(Cbi ~ I(dNBR^2), data=my_CBI_data)
+summary(Quadraticmodel)
+```
+```{r}
+quadratic_model <- lm(dNBR ~ poly(Cbi, 2), data = my_CBI_data)
+
+# Get coefficients of the quadratic model
+coefficients <- coef(quadratic_model)
+
+# Extract coefficients
+intercept <- coefficients[1]
+coeff_cbi <- coefficients[2]
+coeff_cbi2 <- coefficients[3]
+
+# Print the equation of the quadratic model
+cat("Equation of the quadratic model: ")
+cat("y =", round(intercept, 3), "+", round(coeff_cbi, 3), "* Cbi +", round(coeff_cbi2, 3), "* Cbi^2")
+```
+
+r-squared is only .60, lets try other GAM models
+
+```{r}
+gam_mod<-gam(Cbi~s(DNBR),data=my_CBI_data)
+summary(gam_mod)
+```
+
+Slightly better,.61
+GAM approach, Add to graph
+
+```{r}
+CBI_RDBR_PLOT2 <-ggplot(my_CBI_data, aes(x = Cbi, y = dNBR)) + 
+    geom_point() +
+    geom_smooth(method = "lm", formula = y ~ x + I(x^2), size = 1,)+
+    scale_color_viridis_d("Model", end = .75, option = "C")+
+    labs(x="Composite Burn Index (CBI)", y="Differenced Normalized Burn Ratio (dNBR)")+
+    ggtitle("CBI Values by Remotely Sensed dNBR Values for CONUS Dry Western Forest")+
+    stat_poly_eq()+ 
+    theme(plot.title = element_text(hjust = .5))+
+    theme(text = element_text(size = 20))
+plot(CBI_RDBR_PLOT2)
+```
+
+```{r}
+rsquared_unadjusted <- summary(gam_mod)$r.sq[1]
+CBI_RDBR_PLOT3 <- ggplot(my_CBI_data, aes(x = Cbi, y = DNBR)) + 
+     geom_point() +
+    geom_smooth(method = "gam", formula = y ~ x + s(x), size = 1, se = FALSE) +
+     scale_color_viridis_d("Model", end = .75, option = "C") +
+     labs(x = "Composite Burn Index (CBI)", y = "Differenced Normalized Burn Ratio (dNBR)") +
+     ggtitle("CBI Values by Remotely Sensed dNBR Values for CONUS Dry Western Forest") +
+     annotate("text", x = max(my_CBI_data$Cbi), y = min(my_CBI_data$DNBR), 
+              label = paste("Unadjusted R-squared =", round(rsquared_unadjusted, 3)), 
+              hjust = 1, vjust = 0) +
+     theme(plot.title = element_text(hjust = .5)) +
+     theme(text = element_text(size = 20))
+CBI_RDBR_PLOT3
+```
+
+same thing
+
+```{r}
+gam_mod <- gam(DNBR ~ s(Cbi), data = my_CBI_data)
+
+# Calculate unadjusted R-squared
+rsquared_unadjusted <- round(summary(gam_mod)$r.sq[1], 3)
+
+# Extract GAM formula
+gam_formula <- as.character(gam_mod$formula)
+
+# Create the scatter plot with GAM model overlay
+CBI_RDBR_PLOT3 <- ggplot(my_CBI_data, aes(x = Cbi, y = DNBR)) + 
+     geom_point() +
+     geom_smooth(method = "gam", formula = y ~ s(x), size = 1, se = FALSE, color = "blue") +
+     scale_color_viridis_d("Model", end = .75, option = "C") +
+     labs(x = "Composite Burn Index (CBI)", y = "Differenced Normalized Burn Ratio (dNBR)") +
+     ggtitle("CBI Values by Remotely Sensed dNBR Values for CONUS Dry Western Forest") +
+     annotate("text", x = max(my_CBI_data$Cbi), y = min(my_CBI_data$DNBR), 
+              label = paste("Unadjusted R-squared =", rsquared_unadjusted), 
+              hjust = 1, vjust = 0) +
+     annotate("text", x = max(my_CBI_data$Cbi), y = min(my_CBI_data$DNBR) + 10, 
+              label = paste("GAM Formula:", gam_formula), 
+              hjust = 1, vjust = 0) +
+     theme(plot.title = element_text(hjust = .5),
+           text = element_text(size = 20))
+
+CBI_RDBR_PLOT3 # Display the plot
+```
+
+
+
+
+Extra code
+ 
+```{r}
+CBI_RDBR_PLOT4 <- ggplot(my_CBI_data, aes(x = Cbi, y = DNBR)) + 
+     geom_point() +
+     geom_smooth(method = "gam", formula = y ~ x + s(x), size = 1, se = FALSE) +
+     scale_color_viridis_d("Model", end = .75, option = "C") +
+     labs(x = "Composite Burn Index (CBI)", y = "Differenced Normalized Burn Ratio (dNBR)") +
+    ggtitle("CBI Values by Remotely Sensed dNBR Values for CONUS Dry Western Forest") +
+     theme(plot.title = element_text(hjust = .5)) +
+     theme(text = element_text(size = 20))
+ CBI_RDBR_PLOT4 
+```
+
+making a threshold table..
+
+```{r}
+model <- gam(Cbi ~ s(DNBR), data = my_CBI_data)
+cbi_values <- seq(min(my_CBI_data$Cbi), max(my_CBI_data$Cbi), length.out = 100)
+predicted_dnbr <- predict(model, newdata = data.frame(Cbi = cbi_values), type = "response")
+threshold_table <- data.frame(Cbi = cbi_values, Predicted_DNBR = predicted_dnbr)
+hreshold_table$Severity <- cut(threshold_table$Predicted_DNBR,
+                                breaks = c(min(my_CBI_data$DNBR), 1.24, 2.24, max(my_CBI_data$DNBR)),
+                                labels = c("Low", "Moderate", "High"))
+print(threshold_table)
+
+
+
+```
+
+
+
+##just using AI instead of old stuff quadratic eq
+
+```{r}
+model_quad <- lm(DNBR ~ Cbi + I(Cbi^2), data = my_CBI_data)
+
+# Summary of the quadratic regression model
+summary(model_quad)
+
+# Plot the quadratic regression line
+plot(my_CBI_data$Cbi, my_CBI_data$DNBR, main = "Scatterplot of Cbi vs DNBR with Quadratic Regression Line")
+curve(predict(model_quad, newdata = data.frame(Cbi = x)), add = TRUE, col = "red")
+
+# Residuals vs Fitted plot
+plot(model_quad, which = 1)
+
+# Normal Q-Q plot
+plot(model_quad, which = 2)
+
+# Scale-Location plot (Square root of standardized residuals vs fitted values)
+plot(model_quad, which = 3)
+
+# Residuals vs Leverage plot
+plot(model_quad, which = 5)
+```
+
+
+
+```{r}
+intercept <- 33.924
+coef_Cbi <- 23.867
+coef_Cbi_squared <- 54.171
+
+# Values of CBI for estimation
+Cbi_values <- c(1.25, 2.25)
+
+# Calculate estimated DNBR values
+DNBR_est <- intercept + coef_Cbi * Cbi_values + coef_Cbi_squared * Cbi_values^2
+
+# Display the estimated DNBR values
+data.frame(Cbi = Cbi_values, DNBR_est = DNBR_est)
+```
+
+
+
+
+
+
+
+
+#good scatterplot...
+
+```{r}
+scatterplot <- ggplot(my_CBI_data, aes(x = Cbi, y = DNBR)) +
+  geom_point(color = "black", size = 1) +  # Smaller black scatterplot points
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = FALSE, color = "#E74C3C") +  # Red quadratic regression line
+  labs(x = "Composite Burn Index (CBI)", y = "Differenced Normalized Burn Ratio (dNBR)") +  # Axis labels
+  ggtitle("Relationship Between Composite Burn Index (CBI) and \n Remotely Sensed dNBR for Dry Western Coniferous Forests") +  # Plot title (wrapped)
+  theme_minimal() +  # Minimal theme for cleaner appearance
+  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14),  # Bold and centered main title, adjusted font size
+        axis.title = element_text(face = "bold", size = 14),  # Bold axis labels, adjusted font size
+        axis.text = element_text(size = 12),  # Adjusted font size for axis numbers/ticks
+        panel.background = element_rect(fill = "grey90"),  # Shaded grey background grid
+        panel.grid.major = element_line(color = "grey70", size = 0.5),  # Grey grid lines
+        panel.grid.minor = element_blank()) +  # Remove minor grid lines
+  annotate("text", x = min(my_CBI_data$Cbi), y = max(my_CBI_data$DNBR), hjust = 0, vjust = 1,
+           label = bquote("dNBR = 34 + 24 * Cbi + 54 * Cbi²"), size = 4) +  # Annotation for model equation
+  annotate("text", x = min(my_CBI_data$Cbi), y = max(my_CBI_data$DNBR) - 80, hjust = 0, vjust = 1,
+           label = "R² = 0.62", size = 4)  # Annotation for R-squared value
+
+# Save the plot to the specified directory
+ggsave(filename = "C:\\Users\\z44h489\\OneDrive - Montana State University\\Rich's Thesis folder\\CONUSRXSTUDY\\scatterplot.png", 
+       plot = scatterplot, 
+       width = 8, 
+       height = 6, 
+       units = "in", 
+       dpi = 300)
+
+# Print the plot
+print(scatterplot)
+```
+

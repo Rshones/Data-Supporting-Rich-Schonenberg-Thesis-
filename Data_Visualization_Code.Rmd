@@ -1,0 +1,637 @@
+---
+title: "Data Visualization"
+author: "Rich"
+date: "2024-05-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Overall Wilcoxon signed-rank test
+
+```{r}
+wilcox_test_combined <- wilcox.test(adj_df$RX_MEDIAN_ADJ, 
+                                    adj_df$WF_MEDIAN_ADJ,
+                                    conf.int = TRUE,
+                                    conf.level = 0.90)
+
+
+# Print the result for both ecoregions combined
+print("Wilcoxon signed-rank test for both ecoregions combined:")
+print(wilcox_test_combined)
+
+```
+
+
+
+# Ecoregion Analysis
+
+```{r}
+northwestern_data <- adj_df %>% filter(`EPA ECOREgion` == "Northwestern Forested Mountains")
+temperate_data <- adj_df %>% filter(`EPA ECOREgion` == "Temperate Sierras")
+
+# Perform Wilcoxon signed-rank test for Northwestern Forested Mountains
+wilcox_test_northwestern <- wilcox.test(northwestern_data$RX_MEDIAN_ADJ, northwestern_data$WF_MEDIAN_ADJ, paired = TRUE, conf.int = TRUE, conf.level = 0.90)
+
+# Perform Wilcoxon signed-rank test for Temperate Sierras
+wilcox_test_temperate <- wilcox.test(temperate_data$RX_MEDIAN_ADJ, temperate_data$WF_MEDIAN_ADJ, paired = TRUE, conf.int = TRUE, conf.level = 0.90)
+
+# Print results
+cat("Wilcoxon signed-rank test results for Northwestern Forested Mountains:\n")
+print(wilcox_test_northwestern)
+
+cat("\nWilcoxon signed-rank test results for Temperate Sierras:\n")
+print(wilcox_test_temperate)
+```
+
+## Time since fire statsistics 
+
+
+```{r}
+data_0_15_years <- adj_df %>% filter(Classification == "0-15 years")
+wilcox_test_data_0_15_years <- wilcox.test(data_0_15_years$RX_MEDIAN_ADJ, data_0_15_years$WF_MEDIAN_ADJ, paired = TRUE, conf.int = TRUE, conf.level = 0.90)
+ wilcox_test_data_0_15_years 
+```
+
+
+```{r}
+data_15_40_years <- adj_df %>% filter(Classification == "15-40 years")
+wilcox_test_data_0_15_years <- wilcox.test(data_15_40_years$RX_MEDIAN_ADJ, data_15_40_years$WF_MEDIAN_ADJ, paired = TRUE, conf.int = TRUE, conf.level = 0.90)
+ wilcox_test_data_0_15_years 
+```
+
+#Plotting those results 
+
+```{r}
+results_0_15_years <- data.frame(Classification = "0-15 years",
+                                 Estimate = -85.16052,
+                                 Lower_CI = -104.00005,
+                                 Upper_CI = -59.24996,
+                                 p_value = 3.659e-07)
+
+results_15_40_years <- data.frame(Classification = "15-40 years",
+                                  Estimate = -56,  # Corrected estimate
+                                  Lower_CI = -113.250017,
+                                  Upper_CI = -7.749955,
+                                  p_value = 0.04276)
+
+# New combined result
+combined_results <- data.frame(Classification = "0-40 Years",
+                               Estimate = -76,
+                               Lower_CI = -118.0001,
+                               Upper_CI = -45.0000,
+                               p_value = 4.508e-05)
+
+# Combine results
+results_combined <- rbind(results_0_15_years, results_15_40_years, combined_results)
+
+# Wrap title text
+wrapped_title <- str_wrap("Estimated Differences in Fire Severity (Median dNBRs) by Time Since Managed Fire Operation in Dry Western Coniferous Forests ", width = 50)
+
+# Create plot
+plot_classification <- ggplot(results_combined, aes(x = factor(Classification, levels = c("0-15 years", "15-40 years", "0-40 Years")), y = Estimate, ymin = Lower_CI, ymax = Upper_CI)) +
+  geom_point(color = "black", size = 4) +
+  geom_errorbar(width = 0.2, size = 1.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_text(aes(label = ifelse(p_value < 0.01, paste("Estimate:", round(Estimate), "\nP-value: < .01"), 
+                   paste("Estimate:", round(Estimate), "\nP-value:", ifelse(p_value < 0.05, "< .05", round(p_value, 5))))), 
+            vjust = -1, hjust = -0.2, color = "black", size = 5) + # Move annotations to the left
+  labs(title = wrapped_title,
+       y = "Estimated Difference in Fire Severity (Median dNBRs)",
+       x = "Time Since Managed Fire Operation",
+       caption = "Wilcoxon signed-rank test with 90% CI") +  # Updated caption
+  theme_minimal(base_size = 16) + 
+  theme(plot.title = element_text(size = 18, hjust = 0.5, color = "black", face = "bold"),
+        axis.title.x = element_text(size = 16, color = "black", face = "bold"),
+        axis.title.y = element_text(size = 16, color = "black", face = "bold"),
+        axis.text = element_text(size = 14, color = "black"),
+        legend.position = "none") +
+  scale_x_discrete(limits = c("0-15 years", "15-40 years", "0-40 Years"))
+
+```
+
+#same plot left most for total: 
+
+```{r}
+plot_classification <- ggplot(results_combined, aes(x = factor(Classification, levels = c("0-15 years", "15-40 years", "0-40 Years")), y = Estimate, ymin = Lower_CI, ymax = Upper_CI)) +
+  geom_point(color = "black", size = 4) +
+  geom_errorbar(width = 0.2, size = 1.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_text(aes(label = ifelse(p_value < 0.01, paste("Estimate:", round(Estimate), "\nP-value: < .01"), 
+                   paste("Estimate:", round(Estimate), "\nP-value:", ifelse(p_value < 0.05, "< .05", round(p_value, 5))))), 
+            vjust = -1, hjust = -0.2, color = "black", size = 5) + 
+  labs(title = wrapped_title,
+       y = "Estimated Difference in Fire Severity (Median dNBRs)",
+       x = "Time Since Managed Fire Operation",
+       caption = "Wilcoxon signed-rank test with 90% CI") + 
+  theme_minimal(base_size = 16) + 
+  theme(plot.title = element_text(size = 18, hjust = 0.5, color = "black", face = "bold"),
+        axis.title.x = element_text(size = 16, color = "black", face = "bold"),
+        axis.title.y = element_text(size = 16, color = "black", face = "bold"),
+        axis.text = element_text(size = 14, color = "black"),
+        legend.position = "none") +
+  scale_x_discrete(limits = c("0-40 Years", "0-15 years", "15-40 years"))
+```
+
+
+#plots with all 3 regions : 
+
+```{r}
+northwestern_results <- data.frame(Ecoregion = "Northwestern Forested Mountains",
+                                   Estimate = -104.5,
+                                   Lower_CI = -142.24995,
+                                   Upper_CI = -62.00001,
+                                   p_value = 0.0002522)
+
+temperate_results <- data.frame(Ecoregion = "Temperate Sierras",
+                                Estimate = -38.49999,
+                                Lower_CI = -77.75002,
+                                Upper_CI = -20.24998,
+                                p_value = 2.66e-05)
+
+# New combined result
+combined_results <- data.frame(Ecoregion = "Both Ecoregions",
+                               Estimate = -76,
+                               Lower_CI = -118.0001,
+                               Upper_CI = -45.0000,
+                               p_value = 4.508e-05)
+
+# Combine data
+results <- rbind(northwestern_results, temperate_results, combined_results)
+
+# Wrap title text
+wrapped_title <- str_wrap("Estimated Differences in Fire Severities (Median dNBRs) for Lands Treated with Managed Fire vs Untreated Across Two Ecoregions", width = 50)
+
+# Create plot
+plot <- ggplot(results, aes(x = factor(Ecoregion, levels = c("Northwestern Forested Mountains", "Temperate Sierras", "Both Ecoregions")), y = Estimate, ymin = Lower_CI, ymax = Upper_CI)) +
+  geom_errorbar(width = 0.2, size = 1.2) +
+  geom_point(aes(color = Ecoregion), size = 4, position = position_dodge(width = 0.2)) +  # Adjust point position to overlap with error bars
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_text(aes(label = ifelse(p_value < 0.01, paste("Estimate:", round(Estimate, 2), "\nP-value: < .01"), 
+                   paste("Estimate:", round(Estimate, 2), "\nP-value:", round(p_value, 5)))), 
+            vjust = -1, hjust = -0.2) + # Move annotations further to the left
+  scale_color_manual(values = c("Northwestern Forested Mountains" = "#006400", "Temperate Sierras" = "palevioletred", "Both Ecoregions" = "skyblue")) +  # Assign specific colors to points
+  labs(title = wrapped_title,
+       y = "Estimated Difference in Fire Severity (Median dNBRs)",
+       x = "Ecoregion",
+       caption = "Wilcoxon signed-rank test with 90% CI") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 18, hjust = 0.5),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text = element_text(size = 12),
+        legend.position = "none")
+```
+
+
+
+#First Density plot with Median Lines 
+
+```{r}
+density_plot <- adj_df %>%
+  ggplot(aes(x = WF_MEDIAN_ADJ, fill = `EPA ECOREgion`, group = `EPA ECOREgion`)) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +  # Density plots with transparency and no legend
+  scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+  labs(x = "Wildfire Median dNBRs", y = "Density") +  # Axis labels
+  ggtitle("Density Plots of Wildfire Severities by Ecoregion") +  # Main title
+  theme_minimal() +
+  theme(axis.text.x = element_text(color = "black"),  # Black x-axis labels
+        axis.text.y = element_text(color = "black"),  # Black y-axis labels
+        plot.title = element_text(hjust = 0.5, color = "black")) +  # Black main title
+  facet_grid(`EPA ECOREgion` ~ ., scales = "free") +  # Separate plots for each ecoregion
+  geom_vline(data = medians, aes(xintercept = median_value), color = "black", linetype = "dashed")  # Add vertical lines at 
+
+density_plot
+```
+
+#Density plot showing WFs
+
+```{r}
+median_Northwestern <- median(adj_df$WF_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Northwestern Forested Mountains"], na.rm = TRUE)
+median_Temperate <- median(adj_df$WF_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Temperate Sierras"], na.rm = TRUE)
+
+# Create medians data frame
+medians <- data.frame(
+  EPA_ECOREgion = c("Northwestern Forested Mountains", "Temperate Sierras"),
+  median_value = c(median_Northwestern, median_Temperate)
+)
+
+# Density plot
+density_plot <- adj_df %>%
+  ggplot(aes(x = WF_MEDIAN_ADJ, fill = `EPA ECOREgion`, group = `EPA ECOREgion`)) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +  # Density plots with transparency and no legend
+  scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+  labs(x = "Wildfire Median dNBRs", y = "Density") +  # Axis labels
+  ggtitle("Density Plots of Wildfire Severities by Ecoregion") +  # Main title
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(color = "black"),  # Black x-axis labels
+    axis.text.y = element_text(color = "black"),  # Black y-axis labels
+    plot.title = element_text(hjust = 0.5, color = "black")
+  ) +  # Black main title
+  facet_grid(`EPA ECOREgion` ~ ., scales = "free") +  # Separate plots for each ecoregion
+  geom_vline(data = medians, aes(xintercept = median_value), color = "black", linetype = "dashed")  # Add vertical lines at medians
+
+density_plot
+```
+
+
+#Density plot showing RX
+
+
+```{r}
+median_Northwestern <- median(adj_df$RX_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Northwestern Forested Mountains"], na.rm = TRUE)
+median_Temperate <- median(adj_df$RX_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Temperate Sierras"], na.rm = TRUE)
+
+# Create medians data frame
+medians <- data.frame(
+  EPA_ECOREgion = c("Northwestern Forested Mountains", "Temperate Sierras"),
+  median_value = c(median_Northwestern, median_Temperate)
+)
+
+# Density plot
+density_plot2 <- adj_df %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = `EPA ECOREgion`, group = `EPA ECOREgion`)) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +  # Density plots with transparency and no legend
+  scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+  labs(x = "RX Median dNBRs", y = "Density") +  # Axis labels
+  ggtitle("Density Plots of Prescribed Fire Severities by Ecoregion") +  # Main title
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(color = "black"),  # Black x-axis labels
+    axis.text.y = element_text(color = "black"),  # Black y-axis labels
+    plot.title = element_text(hjust = 0.5, color = "black")
+  ) +  # Black main title
+  facet_grid(`EPA ECOREgion` ~ ., scales = "free") +  # Separate plots for each ecoregion
+  geom_vline(data = medians, aes(xintercept = median_value), color = "black", linetype = "dashed")  # Add vertical lines at medians
+
+density_plot2
+```
+
+#test on both graphs
+
+```{r}
+median_Northwestern_WF <- median(adj_df$WF_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Northwestern Forested Mountains"], na.rm = TRUE)
+median_Temperate_WF <- median(adj_df$WF_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Temperate Sierras"], na.rm = TRUE)
+
+# Compute medians for RX_MEDIAN_ADJ
+median_Northwestern_RX <- median(adj_df$RX_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Northwestern Forested Mountains"], na.rm = TRUE)
+median_Temperate_RX <- median(adj_df$RX_MEDIAN_ADJ[adj_df$`EPA ECOREgion` == "Temperate Sierras"], na.rm = TRUE)
+
+# Create medians data frames
+medians_WF <- data.frame(
+  EPA_ECOREgion = c("Northwestern Forested Mountains", "Temperate Sierras"),
+  median_value_WF = c(median_Northwestern_WF, median_Temperate_WF)
+)
+
+medians_RX <- data.frame(
+  EPA_ECOREgion = c("Northwestern Forested Mountains", "Temperate Sierras"),
+  median_value_RX = c(median_Northwestern_RX, median_Temperate_RX)
+)
+
+# Combine data frames
+combined_df <- rbind(
+  data.frame(value = adj_df$WF_MEDIAN_ADJ, type = "WF", `EPA ECOREgion` = adj_df$`EPA ECOREgion`),
+  data.frame(value = adj_df$RX_MEDIAN_ADJ, type = "RX", `EPA ECOREgion` = adj_df$`EPA ECOREgion`)
+)
+
+# Density plot
+density_plot_combined <- combined_df %>%
+  ggplot(aes(x = value, fill = type)) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +  # Density plots with transparency and no legend
+  scale_fill_manual(values = c("WF" = "blue", "RX" = "red")) +  # Apply custom colors
+  labs(x = "Median dNBRs", y = "Density") +  # Axis labels
+  ggtitle("Density Plots of Wildfire and Prescribed Fire Severities by Ecoregion") +  # Main title
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(color = "black"),  # Black x-axis labels
+    axis.text.y = element_text(color = "black"),  # Black y-axis labels
+    plot.title = element_text(hjust = 0.5, color = "black")
+  ) +  # Black main title
+  facet_grid(EPA_ECOREgion ~ type, scales = "free") +  # Separate plots for each ecoregion
+  geom_vline(data = medians_WF, aes(xintercept = median_value_WF), color = "blue", linetype = "dashed") +  # Add vertical lines at WF medians
+  geom_vline(data = medians_RX, aes(xintercept = median_value_RX), color = "red", linetype = "dashed") +  # Add vertical lines at RX medians
+  geom_text(data = medians_WF, aes(x = median_value_WF, y = 0.5, label = sprintf("%.2f", median_value_WF), group = EPA_ECOREgion), color = "blue", size = 3) +  # Add text for WF medians
+  geom_text(data = medians_RX, aes(x = median_value_RX, y = 0.5, label = sprintf("%.2f", median_value_RX), group = EPA_ECOREgion), color = "red", size = 3)  # Add text for RX medians
+
+density_plot_combined
+```
+
+
+
+```{r}
+density_plot <- new_adj_df %>%
+  ggplot(aes(x = WF_MEDIAN_ADJ, fill = `EPA ECOREgion`, group = `EPA ECOREgion`)) +
+  geom_density(alpha = 0.5, show.legend = FALSE) +  # Density plots with transparency and no legend
+  scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+  labs(x = "Wildfire Median dNBRs", y = "Density") +  # Axis labels
+  ggtitle("Density Plots of Wildfire Severities (Median dNBRs) by Ecoregion") +  # Main title
+  theme_minimal() +
+  theme(axis.text.x = element_text(color = "black"),  # Black x-axis labels
+        axis.text.y = element_text(color = "black"),  # Black y-axis labels
+        plot.title = element_text(hjust = 0.5, color = "black")) +  # Black main title
+  facet_grid(`EPA ECOREgion` ~ ., scales = "free") +  # Separate plots for each ecoregion
+  geom_vline(data = medians, aes(xintercept = median_value), color = "black", linetype = "dashed", alpha = 0.3) +  # Add more transparent median lines
+  geom_text(data = medians, aes(x = median_value, y = 0.001, label = round(median_value, 2)), vjust = 1.5, color = "black")  # Add median labels
+
+density_plot
+
+file_path <- "Insert filepath here"
+
+# Export the plot as a PNG image
+ggsave(filename = file_path, plot = density_plot, width = 8, height = 6, dpi = 300)
+```
+
+triple density plot 
+```{r}
+density_plot1 <- adj_df %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "MFO areas")) +
+  geom_density(alpha = 0.7) +  # Orange
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "Untreated areas"), alpha = 0.7) +  # Blue
+  labs(x = "Median dNBRs", y = "Density", title = "Density plot of Wildfire Severities by Region") +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove legend
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Northwestern Forested Mountains
+density_plot2 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Northwestern Forested Mountains") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "MFO areas")) +
+  geom_density(alpha = 0.7) +  # Orange
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "Untreated areas"), alpha = 0.7) +  # Blue
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none") +  # Remove legend
+  ggtitle("Northwestern Forested Mountains")
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Temperate Sierras
+density_plot3 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Temperate Sierras") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "MFO areas")) +
+  geom_density(alpha = 0.7) +  # Orange
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "Untreated areas"), alpha = 0.7) +  # Blue
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none") +  # Remove legend
+  ggtitle("Temperate Sierras")
+
+# Combine and print the plots
+grid.arrange(density_plot1, density_plot2, density_plot3, ncol=1)
+```
+
+## IMPROVED PLOT, not same scale  
+
+
+```{r}
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Northwestern Forested Mountains
+density_plot2 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Northwestern Forested Mountains") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove legend
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Temperate Sierras
+density_plot3 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Temperate Sierras") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove legend
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ across all regions
+density_plot1 <- adj_df %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "Median dNBRs", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove legend
+
+# Wrap main title
+wrapped_main_title <- str_wrap("Distribution of Wildfire Severities (Median dNBR) in Areas Treated with Managed Fire vs Untreated by Ecoregion", width = 60)
+
+# Combine and print the plots with wrapped main title
+plot_grid(
+  ggdraw() + draw_label(wrapped_main_title, size = 16, fontface = "bold"),
+  plot_grid(density_plot2 + ggtitle("Northwestern Forested Mountains"), density_plot3 + ggtitle("Temperate Sierras"), density_plot1 + ggtitle("Both Ecoregions"), ncol = 1, align = "v", labels = c("", "", "")),
+  ncol = 1, rel_heights = c(0.1, 1)
+)
+```
+
+## IMPROVED PLOT,  scaled scale 
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(stringr)
+
+# Determine the x-axis limits for all plots
+x_limits <- range(adj_df$RX_MEDIAN_ADJ, adj_df$WF_MEDIAN_ADJ)
+
+# Density plot for both RX_MEDIAN_ADJ and WF_MEDIAN_ADJ
+density_plot1 <- adj_df %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "Median dNBRs", y = "Density") +
+  ggtitle("Both Ecoregions") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_cartesian(xlim = x_limits)
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Northwestern Forested Mountains
+density_plot2 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Northwestern Forested Mountains") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ggtitle("Northwestern Forested Mountains") +
+  coord_cartesian(xlim = x_limits)
+
+# Density plot for RX_MEDIAN_ADJ and WF_MEDIAN_ADJ in Temperate Sierras
+density_plot3 <- adj_df %>%
+  filter(`EPA ECOREgion` == "Temperate Sierras") %>%
+  ggplot(aes(x = RX_MEDIAN_ADJ, fill = "Untreated areas")) +  # Switched fill colors
+  geom_density(alpha = 0.7) +  # Blue
+  geom_density(aes(x = WF_MEDIAN_ADJ, fill = "MFO areas"), alpha = 0.7) +  # Orange
+  labs(x = "", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ggtitle("Temperate Sierras") +
+  coord_cartesian(xlim = x_limits)
+
+# Wrap main title
+wrapped_main_title <- str_wrap("Distribution of Wildfire Severities (Median dNBR) in Areas Treated with Managed Fire vs Untreated by Ecoregion", width = 60)
+
+# Arrange and print the plots using cowplot
+plot_grid(
+  ggdraw() + draw_label(wrapped_main_title, size = 16, fontface = "bold"),
+  density_plot2,
+  density_plot3,
+  density_plot1,
+  ncol = 1,
+  align = "v",
+  labels = c("", "", "")
+)
+
+```
+
+
+
+```{r}
+plot <- ggplot(new_adj_df, aes(x = RX_MEDIAN_ADJ, y = "RX_MEDIAN_ADJ")) +
+    geom_boxplot(fill = NA, color = "blue", alpha = 0.7, width = 0.3) +
+    labs(x = "Median dNBR Values", 
+         y = "Management Type", 
+         title = str_wrap("Paired Distribution of Median Wildfire Burn Severity (dNBR) for Lands treated with Managed Fire Operations vs. Untreated", width = 60)) +
+    theme_minimal() +
+    theme(axis.line = element_blank(),
+          axis.text.x = element_text(size = 10, color = "black"),
+          axis.text.y = element_text(size = 10, color = "black"),
+          axis.ticks = element_blank(),
+          axis.title.x = element_text(size = 12, color = "black"),
+          axis.title.y = element_text(size = 12, color = "black"),
+          plot.title = element_text(size = 14, hjust = 0.5)) +
+    coord_flip() +
+    geom_point(data = new_adj_df, aes(x = RX_MEDIAN_ADJ, y = "RX_MEDIAN_ADJ"), color = "blue") +
+    geom_boxplot(data = new_adj_df, aes(x = WF_MEDIAN_ADJ, y = "WF_MEDIAN_ADJ"), fill = NA, color = "red", alpha = 0.7, width = 0.3) +
+    geom_point(data = new_adj_df, aes(x = WF_MEDIAN_ADJ, y = "WF_MEDIAN_ADJ"), color = "red") +
+    geom_segment(data = new_adj_df, aes(x = RX_MEDIAN_ADJ, xend = WF_MEDIAN_ADJ, y = "RX_MEDIAN_ADJ", yend = "WF_MEDIAN_ADJ"), color = "grey", alpha = 0.5) +
+    theme(legend.position = "none") +
+    scale_y_discrete(labels = c("RX_MEDIAN_ADJ" = "Previously Treated with Managed Fire ", "WF_MEDIAN_ADJ" = "Untreated"))
+
+# Save the plot
+ggsave(filename = "Insert filepath here", 
+       plot = plot, width = 8, height = 6, units = "in", dpi = 300)
+```
+
+#TIme since fire non infromatice graph  
+```{r}
+median_diff <- new_adj_df %>%
+  group_by(Classification) %>%
+  summarize(Median_Difference = median(abs(WF_MEDIAN_ADJ - RX_MEDIAN_ADJ)),
+            Median_Abs_Difference = median(abs(WF_MEDIAN_ADJ - RX_MEDIAN_ADJ)))
+
+# Create a line chart with error bars
+line_chart <- ggplot(median_diff, aes(x = Classification, y = Median_Difference)) +
+  geom_point() +  # Add points
+  geom_errorbar(aes(ymin = Median_Difference - Median_Abs_Difference, ymax = Median_Difference + Median_Abs_Difference), width = 0.2) +  # Add error bars
+  labs(x = "Classification", y = "Median Difference in dNBR Values") +
+  ggtitle("Median Difference in dNBR Values by Classification") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+
+# Print the line chart
+print(line_chart)
+```
+
+#treatement on Wf severity
+
+```{r}
+region_names <- c("Northwestern Forested Mountains", "Temperate Sierras")
+wilcox_results <- c("W = 543.5, p = 0.0004009, CI = [-154.00001, -65.50003]", 
+                    "W = 472, p = 0.02181, CI = [-60.499971, -6.000063]")
+pseudo_medians <- c(-111, -19.5)
+
+forest_data <- data.frame(region_names, wilcox_results, pseudo_medians)
+
+# Create forest plot
+forest_plot <- ggplot(forest_data, aes(x = region_names, y = pseudo_medians)) +
+  geom_point(color = "blue", size = 3) +
+  geom_errorbar(aes(ymin = pseudo_medians - 10, ymax = pseudo_medians + 10), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_text(aes(label = wilcox_results), vjust = 1.5, size = 3.5) +
+  labs(x = "Ecoregion", y = "Difference in Location (Median)", 
+       title = "Effect of Treatment on Wildfire Severity by Ecoregion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display forest plot
+print(forest_plot)
+```
+
+```{r}
+difference_in_location <- c(-113, -36)  # Difference in location for Northwestern Forested Mountains and Temperate Sierras
+ci_lower <- c(-154, -60.5)  # Lower bound of the 90% confidence interval
+ci_upper <- c(-65.5, -6)  # Upper bound of the 90% confidence interval
+ecoregions <- c("Northwestern Forested Mountains", "Temperate Sierras")
+
+# Create a data frame
+data <- data.frame(ecoregions, difference_in_location, ci_lower, ci_upper)
+
+# Stats
+stats <- c("p = 0.0004", "p = 0.0218")
+difference_in_location_stats <- c("Estimated Difference: -113", "Estimated Difference: -36")
+
+# Combine data and stats
+data$stats <- paste(stats, difference_in_location_stats, sep = "\n")
+
+# Ecoregion colors
+ecoregion_colors <- c("Temperate Sierras" = "#FF6F61",    # Coral red
+                      "Northwestern Forested Mountains" = "#9ACD32")  # Brighter green
+
+# Plot
+ggplot(data, aes(x = ecoregions, y = difference_in_location)) +
+  geom_point(color = "blue", size = 3) +  # Blue dot for the point estimate
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.2) +  # Error bars for the confidence intervals
+  labs(x = "Ecoregion", y = "Difference in Location", 
+       title = "Wilcoxon Signed Rank Test Between Areas Treated with Controlled Fire vs Areas Untreated by Ecoregion") +
+  geom_text(aes(label = stats), vjust = -0.2, hjust = ifelse(data$ecoregions == "Temperate Sierras", 1.5, -0.2), size = 3) +  # Offset the stats down and to the right
+  scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+```
+
+
+```{r}
+difference_in_location <- c(-113, -36)  # Difference in location for Northwestern Forested Mountains and Temperate Sierras
+ci_lower <- c(-154, -60.5)  # Lower bound of the 90% confidence interval
+ci_upper <- c(-65.5, -6)  # Upper bound of the 90% confidence interval
+ecoregions <- c("Northwestern Forested Mountains", "Temperate Sierras")
+
+# Create a data frame
+data <- data.frame(ecoregions, difference_in_location, ci_lower, ci_upper)
+
+# Stats
+stats <- c("p = 0.0004", "p = 0.0218")
+difference_in_location_stats <- c("Estimated Difference: -113", "Estimated Difference: -36")
+
+# Combine data and stats
+data$stats <- paste(stats, difference_in_location_stats, sep = "\n")
+
+# Ecoregion colors
+ecoregion_colors <- c("Temperate Sierras" = "#FF6F61",    # Coral red
+                      "Northwestern Forested Mountains" = "#9ACD32")  # Brighter green
+
+# Plot
+p <- ggplot(data, aes(x = ecoregions, y = difference_in_location)) +
+    geom_point(color = "blue", size = 3) +  # Blue dot for the point estimate
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.2) +  # Error bars for the confidence intervals
+    labs(x = "Ecoregion", y = "dNBR Difference in Location", 
+         title = "Estimated Differences in Fire Severities (Median dNBRs)\nfor Lands Treated with Managed Fire vs Untreated") +
+    geom_text(aes(label = stats), vjust = -0.2, hjust = ifelse(data$ecoregions == "Temperate Sierras", 1.5, -0.2), size = 6) +  # Offset the stats down and to the right
+    scale_fill_manual(values = ecoregion_colors) +  # Apply custom colors
+    theme_minimal(base_size = 12) +  # Increase base font size
+    theme(axis.text.x = element_text(angle = 0, hjust = 0.5),
+          axis.title = element_text(size = 14),  # Adjust axis title font size
+          axis.text = element_text(size = 12),  # Adjust axis text font size
+          plot.title = element_text(size = 16, hjust = 0.5))  # Adjust plot title font size and center it
+
+# Export the graph as a PNG file
+ggsave("Insert filepath here", p, width = 8, height = 6, units = "in")
